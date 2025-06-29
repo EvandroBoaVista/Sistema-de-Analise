@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block styles %}
+{{ super() }}
+<style>
+    /* CORREÇÃO APLICADA */
+    .chart-container {
+        position: relative;
+        width: 100%;
+        height: 320px; /* Altura ajustada para esta página */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Análise de Produtos por Venda</h1>
+</div>
+
+<div class="card mb-4 shadow-sm">
+    <div class="card-header"><h5 class="mb-0"><i class="bi bi-funnel-fill me-2"></i>Filtros de Análise (Baseado na Data de Faturamento)</h5></div>
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('analise_produtos') }}">
+            <div class="row g-3">
+                <div class="col-md-2"><label for="ano" class="form-label">Ano</label><select name="ano" id="ano" class="form-select"><option value="">Todos</option>{% for ano in anos_disponiveis %}<option value="{{ ano }}" {% if ano == current_filters.ano %}selected{% endif %}>{{ ano }}</option>{% endfor %}</select></div>
+                <div class="col-md-2"><label for="mes" class="form-label">Mês</label><select name="mes" id="mes" class="form-select"><option value="">Todos</option>{% for i in range(1, 13) %}<option value="{{ i }}" {% if i|string == current_filters.mes %}selected{% endif %}>{{ ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"][i-1] }}</option>{% endfor %}</select></div>
+                <div class="col-md-2"><label for="grupo" class="form-label">Grupo</label><select name="grupo" id="grupo" class="form-select"><option value="">Todos</option>{% for g in grupos %}<option value="{{ g.GR_CODI }}" {% if g.GR_CODI == current_filters.grupo %}selected{% endif %}>{{ g.GR_DESC }}</option>{% endfor %}</select></div>
+                <div class="col-md-2"><label for="cor" class="form-label">Cor</label><select name="cor" id="cor" class="form-select"><option value="">Todas</option>{% for c in cores %}<option value="{{ c.CO_CODI }}" {% if c.CO_CODI == current_filters.cor %}selected{% endif %}>{{ c.CO_DESC }}</option>{% endfor %}</select></div>
+                <div class="col-md-2"><label for="modelo" class="form-label">Modelo</label><select name="modelo" id="modelo" class="form-select"><option value="">Todos</option>{% for m in modelos %}<option value="{{ m.MO_CODI }}" {% if m.MO_CODI == current_filters.modelo %}selected{% endif %}>{{ m.MO_DESC }}</option>{% endfor %}</select></div>
+                <div class="col-md-2 d-flex align-items-end"><button type="submit" class="btn btn-primary me-2">Filtrar</button><a href="{{ url_for('analise_produtos') }}" class="btn btn-secondary">Limpar</a></div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><h5 class="mb-0">Top 10 Produtos por Valor Vendido</h5></div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="topProdutosChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><h5 class="mb-0">Top 5 Grupos por Quantidade</h5></div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="topGruposChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><h5 class="mb-0">Curva ABC de Produtos</h5></div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="abcChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><h5 class="mb-0">Tempo Médio de Faturamento (dias)</h5></div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="leadTimeChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover table-sm">
+        <thead class="table-dark">
+            <tr><th>Curva</th><th>Cód. Produto</th><th>Descrição</th><th>Grupo</th><th class="text-end">Qtde. Vendida</th><th class="text-end">Valor Total (R$)</th><th class="text-end">% Acumulado</th></tr>
+        </thead>
+        <tbody>
+            {% for produto in produtos_analise %}
+            <tr>
+                <td><span class="badge bg-{{ 'danger' if produto.curva == 'A' else ('warning' if produto.curva == 'B' else 'secondary') }}">{{ produto.curva }}</span></td>
+                <td>{{ produto.codigo }}</td>
+                <td>{{ produto.descricao }}</td>
+                <td>{{ produto.grupo or 'N/A' }}</td>
+                <td class="text-end">{{ "%.0f"|format(produto.qtde|float) }}</td>
+                <td class="text-end">R$ {{ "%.2f"|format(produto.valor|float)|replace('.', ',') }}</td>
+                <td class="text-end">{{ "%.2f"|format(produto.percentual_acumulado) }}%</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center p-4"><strong>Nenhum produto vendido com os filtros selecionados.</strong></td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination %}
+<div class="d-flex justify-content-center mt-4">
+    {{ pagination.links }}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        Chart.register(ChartDataLabels);
+        Chart.defaults.plugins.datalabels.display = false;
+        const fontConfig = { size: 10, family: "system-ui" };
+
+        const ctxTopProdutos = document.getElementById('topProdutosChart');
+        if (ctxTopProdutos) {
+            new Chart(ctxTopProdutos, {
+                type: 'bar',
+                data: {
+                    labels: {{ top_produtos_labels|tojson }},
+                    datasets: [{
+                        label: 'Valor Vendido (R$)',
+                        data: {{ top_produtos_data|tojson }},
+                        backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    scales: { y: { ticks: { font: fontConfig } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        const ctxTopGrupos = document.getElementById('topGruposChart');
+        if (ctxTopGrupos) {
+            new Chart(ctxTopGrupos, {
+                type: 'doughnut',
+                data: {
+                    labels: {{ top_grupos_labels|tojson }},
+                    datasets: [{
+                        label: 'Quantidade Vendida',
+                        data: {{ top_grupos_valores|tojson }},
+                        backgroundColor: ['#ff6384', '#36a2eb', '#ffce56', '#4bc0c0', '#9966ff']
+                    }]
+                },
+                options: {
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top' } }
+                }
+            });
+        }
+
+        const ctxAbc = document.getElementById('abcChart');
+        if (ctxAbc) {
+            const abcData = {{ abc_data|tojson }};
+            const labels = abcData.map(p => p.descricao.substring(0, 15));
+            const valores = abcData.map(p => p.valor);
+            const percentuais = abcData.map(p => p.percentual_acumulado);
+            new Chart(ctxAbc, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Valor por Produto (R$)', data: valores, backgroundColor: 'rgba(255, 99, 132, 0.7)', yAxisID: 'yValor' },
+                        { label: '% Acumulado', data: percentuais, type: 'line', borderColor: 'rgb(255, 205, 86)', tension: 0.1, yAxisID: 'yPercentual' }
+                    ]
+                },
+                options: {
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { font: { size: 9 } } },
+                        yValor: { type: 'linear', position: 'left', title: { display: true, text: 'Valor (R$)' } },
+                        yPercentual: { type: 'linear', position: 'right', min: 0, max: 100, title: { display: true, text: '% Acumulado' }, grid: { drawOnChartArea: false } }
+                    }
+                }
+            });
+        }
+
+        const ctxLeadTime = document.getElementById('leadTimeChart');
+        if (ctxLeadTime) {
+            new Chart(ctxLeadTime, {
+                type: 'line',
+                data: {
+                    labels: {{ lead_time_labels|tojson }},
+                    datasets: [{
+                        label: 'Dias',
+                        data: {{ lead_time_data|tojson }},
+                        borderColor: 'rgb(153, 102, 255)',
+                        backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                        fill: true,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

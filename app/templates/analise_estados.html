@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+
+{% block styles %}
+{{ super() }}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<style>
+    /* CORREÇÃO APLICADA */
+    .chart-container {
+        position: relative;
+        width: 100%;
+        height: 350px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4">{{ title }}</h1>
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header"><h5 class="mb-0"><i class="bi bi-funnel-fill me-2"></i>Filtros de Análise</h5></div>
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('analise_estados') }}">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-2">
+                        <label for="ano" class="form-label">Ano</label>
+                        <select name="ano" id="ano" class="form-select">
+                            {% for ano in anos_disponiveis %}
+                                <option value="{{ ano }}" {% if ano == ano_selecionado %}selected{% endif %}>{{ ano }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="mes" class="form-label">Mês</label>
+                        <select name="mes" id="mes" class="form-select">
+                            <option value="">Todos</option>
+                            {% set meses_map = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"] %}
+                            {% for i in range(1, 13) %}
+                                <option value="{{ i }}" {% if i == mes_selecionado %}selected{% endif %}>{{ meses_map[i-1] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="estado" class="form-label">Estado</label>
+                        <select name="estado" id="estado" class="form-select">
+                            <option value="">Todos</option>
+                            {% for est in estados_disponiveis %}
+                                <option value="{{ est }}" {% if est == estado_selecionado %}selected{% endif %}>{{ est }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="cidade" class="form-label">Cidade</label>
+                        <select name="cidade" id="cidade" class="form-select" {% if not estado_selecionado %}disabled{% endif %}>
+                            <option value="">Todas</option>
+                            {% for cid in cidades_disponiveis %}
+                                <option value="{{ cid.CI_CODI }}" data-estado="{{ cid.CI_ESTA }}" {% if cid.CI_CODI == cidade_selecionada %}selected{% endif %} style="display:none;">
+                                    {{ cid.CI_DENO }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="canal_venda" class="form-label">Canal de Venda</label>
+                        <select name="canal_venda" id="canal_venda" class="form-select">
+                            <option value="todos" {% if canal_venda_selecionado == 'todos' %}selected{% endif %}>Todos os Canais</option>
+                            <option value="fisico" {% if canal_venda_selecionado == 'fisico' %}selected{% endif %}>Lojas Físicas</option>
+                            <option value="ecommerce" {% if canal_venda_selecionado == 'ecommerce' %}selected{% endif %}>E-commerce</option>
+                            <option value="exportacao" {% if canal_venda_selecionado == 'exportacao' %}selected{% endif %}>Exportação</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary me-2">Filtrar</button>
+                        <a href="{{ url_for('analise_estados') }}" class="btn btn-secondary">Limpar</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card text-center">
+                <div class="card-header bg-primary text-white">
+                    Valor Total na Análise
+                </div>
+                <div class="card-body">
+                    <h3 class="card-title">R$ {{ total_geral_valor_fmt }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card text-center">
+                <div class="card-header bg-primary text-white">
+                    Total de Pedidos na Análise
+                </div>
+                <div class="card-body">
+                    <h3 class="card-title">{{ total_geral_pedidos }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header"><h5 class="mb-0">{{ titulo_grafico_atual }}</h5></div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="estadosChartAtual"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% if mes_selecionado and resultados_anteriores %}
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header"><h5 class="mb-0">Top 10 do Mês Anterior ({{ label_mes_anterior }})</h5></div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="estadosChartAnterior"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <h3 class="mb-3">Resultados para o Período Selecionado</h3>
+    <div class="table-responsive">
+        <table class="table table-striped table-hover table-bordered">
+            <thead class="table-dark">
+                <tr>
+                    <th>{{ 'Cidade' if estado_selecionado else 'Estado' }}</th>
+                    <th class="text-end">Valor Total (R$)</th>
+                    <th class="text-end">Nº de Pedidos</th>
+                    <th class="text-end">Quantidade de Itens</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in resultados_atuais %}
+                <tr>
+                    <td>{{ item.localidade }}</td>
+                    <td class="text-end">R$ {{ item.total_valor }}</td>
+                    <td class="text-end">{{ item.total_pedidos }}</td>
+                    <td class="text-end">{{ "%.0f"|format(item.total_itens|float) }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="text-center p-4">
+                        <strong>Nenhuma venda encontrada para o período selecionado.</strong>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if mes_selecionado and resultados_anteriores %}
+    <div class="mt-5">
+        <h3 class="mb-3">Resultados para o Mês Anterior ({{ label_mes_anterior }})</h3>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-bordered table-secondary">
+                <thead class="table-dark">
+                    <tr>
+                        <th>{{ 'Cidade' if estado_selecionado else 'Estado' }}</th>
+                        <th class="text-end">Valor Total (R$)</th>
+                        <th class="text-end">Nº de Pedidos</th>
+                        <th class="text-end">Quantidade de Itens</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in resultados_anteriores %}
+                    <tr>
+                        <td>{{ item.localidade }}</td>
+                        <td class="text-end">R$ {{ item.total_valor }}</td>
+                        <td class="text-end">{{ item.total_pedidos }}</td>
+                        <td class="text-end">{{ "%.0f"|format(item.total_itens|float) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="text-center p-4">
+                            <strong>Nenhuma venda encontrada para o período anterior.</strong>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script>
+$(document).ready(function() {
+    $('#cidade').select2({
+        theme: "bootstrap-5",
+        placeholder: "Selecione uma cidade",
+    });
+
+    Chart.register(ChartDataLabels);
+    
+    function formatNumber(value) {
+        if (value >= 1000000) {
+            return 'R$ ' + (value / 1000000).toFixed(1).replace('.', ',') + 'M';
+        }
+        if (value >= 1000) {
+            return 'R$ ' + (value / 1000).toFixed(1).replace('.', ',') + 'k';
+        }
+        return 'R$ ' + new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+    }
+
+    function createBarChart(canvasId, labels, data) {
+        const ctx = document.getElementById(canvasId);
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Valor Total Vendido (R$)',
+                        data: data,
+                        backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        datalabels: {
+                            anchor: 'center',
+                            align: 'center',
+                            color: 'white',
+                            font: { weight: 'bold' },
+                            formatter: function(value, context) {
+                                if (context.dataset.data[context.dataIndex] < (context.chart.scales.y.max / 10)) {
+                                    return '';
+                                }
+                                return formatNumber(value);
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value, index, values) {
+                                    return 'R$ ' + value.toLocaleString('pt-BR');
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    createBarChart('estadosChartAtual', {{ chart_labels_atual|tojson }}, {{ chart_data_atual|tojson }});
+    createBarChart('estadosChartAnterior', {{ chart_labels_anterior|tojson }}, {{ chart_data_anterior|tojson }});
+
+
+    const estadoSelect = document.getElementById('estado');
+    const cidadeSelect = document.getElementById('cidade');
+
+    function atualizarCidades() {
+        const estadoSelecionado = estadoSelect.value;
+        const cidadeSelecionadaAntes = cidadeSelect.value;
+
+        $(cidadeSelect).empty().append(new Option('Todas', ''));
+
+        if (estadoSelecionado) {
+            cidadeSelect.disabled = false;
+            {% for cid in cidades_disponiveis %}
+                if ("{{ cid.CI_ESTA }}" === estadoSelecionado) {
+                    let newOption = new Option("{{ cid.CI_DENO }}", "{{ cid.CI_CODI }}");
+                    $(cidadeSelect).append(newOption);
+                }
+            {% endfor %}
+            $(cidadeSelect).val(cidadeSelecionadaAntes);
+        } else {
+            cidadeSelect.disabled = true;
+        }
+        $(cidadeSelect).trigger('change.select2');
+    }
+
+    $('#estado').on('change', function() {
+        $(cidadeSelect).val('').trigger('change');
+        atualizarCidades();
+    });
+
+    atualizarCidades();
+});
+</script>
+{% endblock %}

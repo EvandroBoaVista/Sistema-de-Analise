@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Relatório de Itens Vendidos</h1>
+</div>
+
+<div class="card mb-4 shadow-sm">
+    <div class="card-header">
+        <i class="bi bi-funnel-fill me-1"></i>Filtrar por Período
+    </div>
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('relatorio_itens_vendidos') }}">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="data_inicio" class="form-label">Data de Início do Pedido</label>
+                    <input type="date" name="data_inicio" id="data_inicio" class="form-control" value="{{ current_filters.data_inicio or '' }}">
+                </div>
+                <div class="col-md-4">
+                    <label for="data_fim" class="form-label">Data de Fim do Pedido</label>
+                    <input type="date" name="data_fim" id="data_fim" class="form-control" value="{{ current_filters.data_fim or '' }}">
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary">Filtrar</button>
+                    <a href="{{ url_for('relatorio_itens_vendidos') }}" class="btn btn-secondary">Limpar</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover table-sm">
+        <thead class="table-dark">
+            <tr>
+                <th>Data do Pedido</th>
+                <th>Nº Pedido</th>
+                <th>Cód. Produto</th>
+                <th>Descrição do Produto</th>
+                <th>Grupo</th>
+                <th>Modelo</th>
+                <th>Cor</th>
+                <th class="text-end">Quantidade</th>
+                <th class="text-end">Valor Unitário</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in itens_paginados.items %}
+            <tr>
+                <td>{{ item.PD_DATA }}</td>
+                <td><a href="{{ url_for('detalhe_pedido', numero_pedido=item.PD_NUME) }}">{{ item.PD_NUME }}</a></td>
+                <td>{{ item.PR_CODI }}</td>
+                <td>{{ item.PR_DENO }}</td>
+                <td>{{ item.GR_DESC or 'N/A' }}</td>
+                <td>{{ item.MO_DESC or 'N/A' }}</td>
+                <td>{{ item.CO_DESC or 'N/A' }}</td>
+                <td class="text-end">{{ "%.0f"|format(item.DP_QTDE|float) }}</td>
+                <td class="text-end">R$ {{ "%.2f"|format(item.DP_VLUN|float)|replace('.', ',') }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="9" class="text-center p-4">
+                    <strong>Nenhum item vendido no período selecionado.</strong>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if itens_paginados.pages > 1 %}
+<nav aria-label="Paginação do relatório">
+    <ul class="pagination justify-content-center">
+        {% set url_args = request.args.to_dict() %}
+        
+        <li class="page-item {% if not itens_paginados.has_prev %}disabled{% endif %}">
+            {% set _ = url_args.update({'page': itens_paginados.prev_num}) %}
+            <a class="page-link" href="{{ url_for('relatorio_itens_vendidos', **url_args) }}">Anterior</a>
+        </li>
+
+        {% for page_num in itens_paginados.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+            {% if page_num %}
+                {% set _ = url_args.update({'page': page_num}) %}
+                <li class="page-item {% if page_num == itens_paginados.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('relatorio_itens_vendidos', **url_args) }}">{{ page_num }}</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% endif %}
+        {% endfor %}
+        
+        <li class="page-item {% if not itens_paginados.has_next %}disabled{% endif %}">
+            {% set _ = url_args.update({'page': itens_paginados.next_num}) %}
+            <a class="page-link" href="{{ url_for('relatorio_itens_vendidos', **url_args) }}">Próxima</a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+
+{% endblock %}

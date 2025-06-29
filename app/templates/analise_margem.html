@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block styles %}
+{{ super() }}
+<style>
+    .table th, .table td {
+        vertical-align: middle;
+        white-space: nowrap;
+        font-size: 0.9rem;
+    }
+    .info-line {
+        display: block;
+        line-height: 1.2;
+        white-space: normal;
+    }
+    .text-muted-small {
+        font-size: 0.8rem;
+        color: #6c757d !important;
+    }
+    .kpi-card {
+        background-color: #fff;
+        border-radius: .5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        height: 100%;
+    }
+    .ranking-card .list-group-item {
+        padding: 0.5rem 0.75rem;
+    }
+    .ranking-card .badge {
+        font-size: 0.8em;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4">{{ title }}</h1>
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-funnel-fill me-1"></i>Filtrar Análise</h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('analise_margem_contribuicao') }}">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label for="data_inicio" class="form-label">Data de Início da Nota</label>
+                        <input type="date" name="data_inicio" id="data_inicio" class="form-control" value="{{ current_filters.data_inicio or '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="data_fim" class="form-label">Data de Fim da Nota</label>
+                        <input type="date" name="data_fim" id="data_fim" class="form-control" value="{{ current_filters.data_fim or '' }}">
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label for="grupo" class="form-label">Grupo</label>
+                        <select name="grupo" id="grupo" class="form-select">
+                            <option value="">Todos</option>
+                            {% for grupo in filter_options.grupos %}
+                                <option value="{{ grupo }}" {% if grupo == current_filters.grupo %}selected{% endif %}>{{ grupo }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="subgrupo" class="form-label">Subgrupo</label>
+                        <select name="subgrupo" id="subgrupo" class="form-select">
+                            <option value="">Todos</option>
+                            {% for subgrupo in filter_options.subgrupos %}
+                                <option value="{{ subgrupo }}" {% if subgrupo == current_filters.subgrupo %}selected{% endif %}>{{ subgrupo }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="modelo" class="form-label">Modelo</label>
+                        <select name="modelo" id="modelo" class="form-select">
+                            <option value="">Todos</option>
+                            {% for modelo in filter_options.modelos %}
+                                <option value="{{ modelo }}" {% if modelo == current_filters.modelo %}selected{% endif %}>{{ modelo }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="status" class="form-label">Status do Produto</label>
+                        <select name="status" id="status" class="form-select">
+                            <option value="">Todos</option>
+                            <option value="S" {% if 'S' == current_filters.status %}selected{% endif %}>Em Linha</option>
+                            <option value="N" {% if 'N' == current_filters.status %}selected{% endif %}>Fora de Linha</option>
+                        </select>
+                    </div>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary">Filtrar</button>
+                    <a href="{{ url_for('analise_margem_contribuicao') }}" class="btn btn-secondary ms-2">Limpar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-3 col-md-6">
+            <div class="card kpi-card text-center h-100">
+                <div class="card-header bg-primary text-white">Total Faturado (NF)</div>
+                <div class="card-body d-flex align-items-center justify-content-center">
+                    <h4 class="card-title mb-0">{{ kpis.total_faturado | format_currency }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card kpi-card text-center h-100">
+                <div class="card-header bg-danger text-white">Custo Líquido Total</div>
+                <div class="card-body d-flex align-items-center justify-content-center">
+                    <h4 class="card-title mb-0">{{ kpis.total_custo_liquido | format_currency }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card kpi-card text-center h-100">
+                <div class="card-header bg-success text-white">Margem de Contribuição Total (R$)</div>
+                <div class="card-body d-flex align-items-center justify-content-center">
+                    <h4 class="card-title mb-0">{{ kpis.total_mc | format_currency }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card kpi-card text-center h-100">
+                <div class="card-header bg-success text-white">M.C. Média (%)</div>
+                <div class="card-body d-flex align-items-center justify-content-center">
+                    <h4 class="card-title mb-0">{{ "%.2f"|format(kpis.media_mc_perc|float) }}%</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {# --- NOVA SEÇÃO COM OS RANKINGS --- #}
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <div class="card ranking-card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-trophy-fill text-warning me-2"></i>Top 20 Produtos por Valor de Venda</h5>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                        {% for produto in top_vendas %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                           <span>{{ loop.index }}. {{ produto.produto_desc }}</span> 
+                           <span class="badge bg-primary rounded-pill">{{ produto.total_venda | format_currency }}</span>
+                        </li>
+                        {% else %}
+                        <li class="list-group-item text-center">Nenhum dado encontrado.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card ranking-card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-graph-up-arrow text-success me-2"></i>Top 20 Produtos por Rentabilidade (R$)</h5>
+                </div>
+                <div class="card-body p-0">
+                    <ul class="list-group list-group-flush">
+                         {% for produto in top_rentabilidade %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                           <span>{{ loop.index }}. {{ produto.produto_desc }}</span> 
+                           <span class="badge bg-success rounded-pill">{{ produto.total_margem | format_currency }}</span>
+                        </li>
+                        {% else %}
+                        <li class="list-group-item text-center">Nenhum dado encontrado.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover table-sm">
+            <thead class="table-dark">
+                <tr>
+                    <th>Data NF</th>
+                    <th>Nota / Pedido</th>
+                    <th>Cliente / Produto</th>
+                    <th>Grupo</th>
+                    <th>Status</th>
+                    <th class="text-end">Qtde</th>
+                    <th class="text-end">Vlr Unitário (Ped)</th>
+                    <th class="text-end">Receita (c/ Nota)</th>
+                    <th class="text-end">Inf. (s/ Nota)</th>
+                    <th class="text-end" style="background-color: #004c94;">Receita Total do Item</th>
+                    <th class="text-end">Custo Unit. (Ficha)</th>
+                    <th class="text-end">Custo Total Ficha</th>
+                    <th class="text-end">ICMS</th>
+                    <th class="text-end">IPI</th>
+                    <th class="text-end">PIS</th>
+                    <th class="text-end">COFINS</th>
+                    <th class="text-end bg-success text-white">M.C. (R$)</th>
+                    <th class="text-end bg-success text-white">M.C. (%)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in dados_paginados.items %}
+                    <tr>
+                        <td>{{ item.data_nf.strftime('%d/%m/%Y') if item.data_nf else '' }}</td>
+                        <td>
+                            <span class="info-line">NF: <a href="{{ url_for('detalhe_fatura', fatura_id=item.fatura_id) }}">{{ item.nf_numero }}</a></span>
+                            <span class="info-line text-muted-small">Ped: <a href="{{ url_for('detalhe_pedido', numero_pedido=item.pedido_numero) }}">{{ item.pedido_numero }}</a></span>
+                        </td>
+                        <td>
+                            <span class="info-line"><strong>{{ item.cliente_nome }}</strong></span>
+                            <span class="info-line text-muted-small">{{ item.produto_cod }} - {{ item.produto_desc }}</span>
+                        </td>
+                        <td>{{ item.grupo_descricao or 'N/A' }}</td>
+                        <td>
+                            {% if item.produto_status == 'S' %}
+                                <span class="badge bg-success">Em Linha</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Fora de Linha</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">{{ "%.2f"|format(item.qtde|float) }}</td>
+                        <td class="text-end">{{ item.vlr_unit_ped | format_currency }}</td>
+                        <td class="text-end">{{ item.receita_com_nota | format_currency }}</td>
+                        <td class="text-end">{{ item.receita_sem_nota | format_currency }}</td>
+                        <td class="text-end fw-bold" style="background-color: #e6f0f7;">
+                            {{ item.receita_total_item | format_currency }}
+                        </td>
+                        <td class="text-end">{{ item.custo_unit_ficha | format_currency }}</td>
+                        <td class="text-end table-danger">{{ item.custo_producao | format_currency }}</td>
+                        <td class="text-end" style="background-color: #f8f9fa;">{{ item.icms | format_currency }}</td>
+                        <td class="text-end" style="background-color: #f8f9fa;">{{ item.ipi | format_currency }}</td>
+                        <td class="text-end" style="background-color: #f8f9fa;">{{ item.pis | format_currency }}</td>
+                        <td class="text-end" style="background-color: #f8f9fa;">{{ item.cofins | format_currency }}</td>
+                        <td class="text-end fw-bold table-success">{{ item.mc_valor | format_currency }}</td>
+                        <td class="text-end fw-bold table-success">{{ "%.2f"|format(item.mc_perc|float) }}%</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="18" class="text-center p-4">
+                            <strong>Nenhum item faturado encontrado para os filtros selecionados.</strong>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# Paginação #}
+    {% if dados_paginados.pages > 1 %}
+    <nav class="mt-4" aria-label="Paginação">
+        <ul class="pagination justify-content-center">
+            {% set url_args = request.args.to_dict() %}
+            <li class="page-item {% if not dados_paginados.has_prev %}disabled{% endif %}">
+                {% set _ = url_args.update({'page': dados_paginados.prev_num}) %}
+                <a class="page-link" href="{{ url_for('analise_margem_contribuicao', **url_args) }}">Anterior</a>
+            </li>
+            {% for page_num in dados_paginados.iter_pages() %}
+                {% if page_num %}
+                    {% set _ = url_args.update({'page': page_num}) %}
+                    <li class="page-item {% if page_num == dados_paginados.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('analise_margem_contribuicao', **url_args) }}">{{ page_num }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+            {% endfor %}
+            <li class="page-item {% if not dados_paginados.has_next %}disabled{% endif %}">
+                {% set _ = url_args.update({'page': dados_paginados.next_num}) %}
+                <a class="page-link" href="{{ url_for('analise_margem_contribuicao', **url_args) }}">Próxima</a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

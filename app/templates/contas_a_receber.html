@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block styles %}
+{{ super() }}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<style>
+    .kpi-card {
+        background-color: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: .375rem;
+        padding: 1.25rem;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        text-align: center;
+    }
+    .kpi-title {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #6c757d;
+        margin-bottom: 0.5rem;
+        text-transform: uppercase;
+    }
+    .kpi-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #212529;
+    }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4">Análise de Contas a Receber</h1>
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header"><h5 class="mb-0"><i class="bi bi-funnel-fill me-2"></i>Filtros de Análise</h5></div>
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('contas_a_receber') }}">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label for="cliente" class="form-label">Cliente</label>
+                        <select name="cliente" id="cliente" class="form-select">
+                            <option value="">Todos os Clientes</option>
+                            {% for c in clientes %}
+                            <option value="{{ c.CL_CODI }}" {% if c.CL_CODI == filters.cliente %}selected{% endif %}>{{ c.CL_NOME }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="representante" class="form-label">Representante</label>
+                        <select name="representante" id="representante" class="form-select">
+                            <option value="">Todos</option>
+                            {% for repr in representantes %}
+                            <option value="{{ repr.RP_CODI }}" {% if repr.RP_CODI == filters.representante %}selected{% endif %}>{{ repr.RP_NOME }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="faixa_atraso" class="form-label">Faixa de Atraso (Vencidos)</label>
+                        <select name="faixa_atraso" id="faixa_atraso" class="form-select">
+                            <option value="" {% if filters.faixa_atraso == '' %}selected{% endif %}>Todas</option>
+                            <option value="1-30" {% if filters.faixa_atraso == '1-30' %}selected{% endif %}>1 a 30 dias</option>
+                            <option value="31-90" {% if filters.faixa_atraso == '31-90' %}selected{% endif %}>31 a 90 dias</option>
+                            <option value="91+" {% if filters.faixa_atraso == '91+' %}selected{% endif %}>Acima de 90 dias</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label for="origem" class="form-label">Origem do Título</label>
+                        <select name="origem" id="origem" class="form-select">
+                            <option value="" {% if filters.origem == '' %}selected{% endif %}>Todas</option>
+                            <option value="NOTA" {% if filters.origem == 'NOTA' %}selected{% endif %}>Nota Fiscal</option>
+                            <option value="PAPELETA" {% if filters.origem == 'PAPELETA' %}selected{% endif %}>Papeleta</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="ano" class="form-label">Ano Vencimento</label>
+                        <select name="ano" id="ano" class="form-select">
+                            <option value="">Todos</option>
+                            {% for ano_disp in anos_disponiveis %}
+                                <option value="{{ ano_disp }}" {% if ano_disp|string == filters.ano %}selected{% endif %}>{{ ano_disp }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="mes" class="form-label">Mês Vencimento</label>
+                        <select name="mes" id="mes" class="form-select">
+                            <option value="">Todos</option>
+                             {% set meses_map = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"] %}
+                            {% for i in range(1, 13) %}
+                                <option value="{{ i }}" {% if i|string == filters.mes %}selected{% endif %}>{{ meses_map[i-1] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label for="vcto_inicio" class="form-label">Vencimento De</label>
+                        <input type="date" name="vcto_inicio" id="vcto_inicio" class="form-control" value="{{ filters.vcto_inicio or '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="vcto_fim" class="form-label">Vencimento Até</label>
+                        <input type="date" name="vcto_fim" id="vcto_fim" class="form-control" value="{{ filters.vcto_fim or '' }}">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">Filtrar</button>
+                        <a href="{{ url_for('contas_a_receber') }}" class="btn btn-secondary">Limpar</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-lg-4"><div class="kpi-card shadow-sm"><div class="kpi-title">Total da Carteira (A Vencer + Vencido)</div><div class="kpi-value">{{ kpis.total_carteira | format_currency }}</div></div></div>
+        <div class="col-md-6 col-lg-4"><div class="kpi-card shadow-sm"><div class="kpi-title">Total Vencido ({{ kpis.titulos_vencidos }} títulos)</div><div class="kpi-value">{{ kpis.total_vencido | format_currency }}</div></div></div>
+        <div class="col-md-12 col-lg-4"><div class="kpi-card shadow-sm"><div class="kpi-title">Tempo Médio de Recebimento</div><div class="kpi-value">{{ "%.1f"|format(kpis.tmr) }} dias</div></div></div>
+    </div>
+    
+    <div class="row g-4 mb-4">
+        <div class="col-md-6"><div class="kpi-card shadow-sm"><div class="kpi-title">% do Valor Filtrado em Notas</div><div class="kpi-value">{{ "%.2f"|format(kpis.perc_notas) }}%</div></div></div>
+        <div class="col-md-6"><div class="kpi-card shadow-sm"><div class="kpi-title">% do Valor Filtrado em Papeletas</div><div class="kpi-value">{{ "%.2f"|format(kpis.perc_papeletas) }}%</div></div></div>
+    </div>
+
+
+    <div class="table-responsive">
+        <table class="table table-hover table-sm">
+            <thead class="table-dark">
+                <tr>
+                    <th style="width: 2%;"></th>
+                    <th>Pedido / Nota</th>
+                    <th>Cliente</th>
+                    <th>Representante</th>
+                    <th>Emissão</th>
+                    <th class="text-end">Valor Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for group in grouped_titulos %}
+                <tr data-bs-toggle="collapse" href="#collapse-{{ group.pedido|replace('/', '-') if group.pedido else group.installments[0].movimento.id }}" role="button" style="cursor: pointer;" class="align-middle">
+                    <td><i class="bi bi-chevron-down"></i></td>
+                    <td>
+                        {% if group.pedido %}
+                            <a href="{{ url_for('detalhe_pedido', numero_pedido=group.pedido) }}">{{ group.pedido }}</a>
+                        {% else %}
+                            <span>Avulso</span>
+                        {% endif %}
+                        {% if group.nota %}
+                        <small class="text-muted d-block">Nota: {{ group.nota }}</small>
+                        {% endif %}
+                    </td>
+                    <td>{{ group.cliente.CL_NOME if group.cliente else 'N/A' }}</td>
+                    <td>{{ group.representante.RP_NOME if group.representante else 'N/A' }}</td>
+                    <td>{{ group.emissao.strftime('%d/%m/%Y') if group.emissao else '' }}</td>
+                    <td class="text-end fw-bold">{{ group.total_valor | format_currency }}</td>
+                </tr>
+                <tr class="collapse" id="collapse-{{ group.pedido|replace('/', '-') if group.pedido else group.installments[0].movimento.id }}">
+                    <td colspan="6" class="p-0">
+                        <div class="p-3 bg-light border">
+                            <h6 class="mb-2">Parcelas do Pedido</h6>
+                            <table class="table table-sm table-bordered mb-0 bg-white">
+                                <thead class="table-secondary">
+                                    <tr>
+                                        <th>Parcela</th>
+                                        <th>Vencimento</th>
+                                        <th>Baixa</th>
+                                        <th class="text-end">Valor Parcela</th>
+                                        <th class="text-center">Atraso (dias)</th>
+                                        <th class="text-center">Origem</th>
+                                        <th class="text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in group.installments %}
+                                    {% set status_map = {'aberto': 'bg-primary', 'vencido': 'bg-danger', 'baixado': 'bg-success'} %}
+                                    <tr>
+                                        <td>{{ item.movimento.mv_orde }}</td>
+                                        <td>{{ item.movimento.mv_vcto.strftime('%d/%m/%Y') if item.movimento.mv_vcto else '' }}</td>
+                                        <td>{{ item.movimento.mv_dtbx.strftime('%d/%m/%Y') if item.movimento.mv_dtbx else '' }}</td>
+                                        <td class="text-end">{{ item.movimento.mv_valo | format_currency }}</td>
+                                        <td class="text-center">
+                                            {% if item.dias_atraso > 0 %}
+                                                <span class="badge bg-danger">{{ item.dias_atraso }}</span>
+                                            {% elif item.status == 'baixado' %}
+                                                <span class="badge bg-success">Em dia</span>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge {{ 'bg-info text-dark' if item.movimento.mv_origem == 'NOTA' else 'bg-secondary' }}">{{ item.movimento.mv_origem }}</span>
+                                        </td>
+                                        <td class="text-center"><span class="badge {{ status_map[item.status] }}">{{ item.status | capitalize }}</span></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center p-4">
+                        <strong>Nenhum título encontrado com os filtros selecionados.</strong>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# --- CORREÇÃO APLICADA --- #}
+    {% if pagination and pagination.total > pagination.per_page %}
+    <div class="d-flex justify-content-center mt-4">
+        {{ pagination.links }}
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(document).ready(function() {
+    $('#cliente').select2({
+        theme: "bootstrap-5",
+        placeholder: "Selecione um cliente",
+    });
+    $('#representante').select2({
+        theme: "bootstrap-5",
+        placeholder: "Selecione um representante",
+    });
+});
+</script>
+{% endblock %}

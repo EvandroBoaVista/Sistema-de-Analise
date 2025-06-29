@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block styles %}
+{{ super() }}
+<style>
+    /* CORREÇÃO APLICADA */
+    .chart-container {
+        position: relative;
+        width: 100%;
+        height: 300px; /* Altura ajustada para este gráfico */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4">Análise de Recepção vs. Faturamento</h1>
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header"><h5 class="mb-0"><i class="bi bi-funnel-fill me-2"></i>Filtros de Análise</h5></div>
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('analise_recepcao_faturamento') }}">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label for="ano" class="form-label">Ano (da Recepção)</label>
+                        <select name="ano" id="ano" class="form-select">
+                            {% for ano_disp in anos_disponiveis %}
+                                <option value="{{ ano_disp }}" {% if ano_disp == ano_selecionado %}selected{% endif %}>{{ ano_disp }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="mes" class="form-label">Mês (da Recepção)</label>
+                        <select name="mes" id="mes" class="form-select">
+                            {% set meses_map = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"] %}
+                            {% for i in range(1, 13) %}
+                                <option value="{{ i }}" {% if i == mes_selecionado %}selected{% endif %}>{{ meses_map[i-1] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-primary me-2">Analisar Período</button>
+                        <a href="{{ url_for('analise_recepcao_faturamento') }}" class="btn btn-secondary">Mês Atual</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card text-center h-100">
+                <div class="card-header bg-primary text-white">
+                    Pedidos Faturados no Período
+                </div>
+                <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                    <h3 class="card-title mb-0">{{ kpis.total_pedidos }}</h3>
+                     <p class="card-text small text-muted mt-2 mb-0" style="font-size: 0.75rem;">
+                        Pedidos recepcionados no mês/ano selecionado que já foram faturados.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card text-center h-100">
+                <div class="card-header bg-info text-white">
+                    Tempo Médio para Faturar
+                </div>
+                <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                    <h3 class="card-title mb-0">{{ "%.1f"|format(kpis.tempo_medio|float)|replace('.', ',') }} dias</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm h-100">
+                <div class="card-header"><h5 class="mb-0">Tempo Médio para Faturar ({{ ano_selecionado }} vs {{ ano_anterior }})</h5></div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="leadTimeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <h3 class="mb-3">Detalhes dos Pedidos do Período ({{ meses_map[mes_selecionado-1] }} de {{ ano_selecionado }})</h3>
+    <div class="table-responsive">
+        <table class="table table-striped table-hover table-sm">
+            <thead class="table-dark">
+                <tr>
+                    <th>Nº Pedido</th>
+                    <th>Cliente</th>
+                    <th>Representante</th>
+                    <th>Data Recepção</th>
+                    <th>Data Faturamento</th>
+                    <th class="text-center">Dias para Faturar</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pedido_row in pedidos_paginados.items %}
+                {% set pedido = pedido_row[0] %}
+                <tr>
+                    <td><a href="{{ url_for('detalhe_pedido', numero_pedido=pedido.PD_NUME) }}">{{ pedido.PD_NUME }}</a></td>
+                    <td>{{ pedido.cliente.CL_NOME if pedido.cliente else 'N/A' }}</td>
+                    <td>{{ pedido.representante.RP_NOME if pedido.representante else 'N/A' }}</td>
+                    <td>{{ pedido.PD_DTRC.strftime('%d/%m/%Y') }}</td>
+                    <td>{{ pedido.PD_DTEM.strftime('%d/%m/%Y') }}</td>
+                    <td class="text-center">
+                        <span class="badge bg-secondary fs-6">
+                            {{ "%.0f"|format(pedido_row.dias_para_faturar|float) }}
+                        </span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center p-4">
+                        <strong>Nenhum pedido encontrado com os filtros selecionados.</strong>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if pedidos_paginados.pages > 1 %}
+    <nav class="mt-4" aria-label="Paginação de pedidos">
+        <ul class="pagination justify-content-center">
+            {% set url_args = request.args.to_dict() %}
+            
+            <li class="page-item {% if not pedidos_paginados.has_prev %}disabled{% endif %}">
+                {% set _ = url_args.update({'page': pedidos_paginados.prev_num}) %}
+                <a class="page-link" href="{{ url_for('analise_recepcao_faturamento', **url_args) }}">Anterior</a>
+            </li>
+
+            {% for page_num in pedidos_paginados.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                {% if page_num %}
+                    {% set _ = url_args.update({'page': page_num}) %}
+                    <li class="page-item {% if page_num == pedidos_paginados.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('analise_recepcao_faturamento', **url_args) }}">{{ page_num }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+            {% endfor %}
+            
+            <li class="page-item {% if not pedidos_paginados.has_next %}disabled{% endif %}">
+                {% set _ = url_args.update({'page': pedidos_paginados.next_num}) %}
+                <a class="page-link" href="{{ url_for('analise_recepcao_faturamento', **url_args) }}">Próxima</a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    Chart.register(ChartDataLabels);
+
+    const ctxLeadTime = document.getElementById('leadTimeChart');
+    if (ctxLeadTime) {
+        new Chart(ctxLeadTime, {
+            type: 'bar',
+            data: {
+                labels: {{ chart_labels|tojson }},
+                datasets: [
+                    {
+                        label: 'Ano {{ ano_anterior }}',
+                        data: {{ chart_data_anterior|tojson }},
+                        backgroundColor: 'rgba(201, 203, 207, 0.7)',
+                        borderColor: 'rgba(201, 203, 207, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Ano {{ ano_selecionado }}',
+                        data: {{ chart_data_atual|tojson }},
+                        backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Dias'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    datalabels: {
+                        display: true,
+                        anchor: 'end',
+                        align: 'top',
+                        color: '#363636',
+                        font: {
+                            weight: 'bold',
+                            size: 10
+                        },
+                        formatter: function(value, context) {
+                            if (value === 0) {
+                                return '';
+                            }
+                            return value.toFixed(1).replace('.', ',');
+                        }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

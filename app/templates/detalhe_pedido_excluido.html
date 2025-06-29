@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-secondary text-white">
+            <h2 class="mb-0 d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-archive-fill me-2"></i>Detalhes do Pedido Excluído</span>
+                <span class="badge bg-light text-dark fs-5">{{ pedido.PD_NUME }}</span>
+            </h2>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong><i class="bi bi-person me-2"></i>Cliente:</strong> {{ pedido.cliente.CL_NOME if pedido.cliente else pedido.PD_CLIE }}</p>
+                    <p><strong><i class="bi bi-person-badge me-2"></i>Representante:</strong> {{ pedido.representante.RP_NOME if pedido.representante else pedido.PD_REPR }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong><i class="bi bi-calendar-plus me-2"></i>Data de Criação:</strong> {{ pedido.PD_DATA.strftime('%d/%m/%Y') if pedido.PD_DATA else '' }}</p>
+                    <p><strong><i class="bi bi-cash-coin me-2"></i>Valor Registrado:</strong> R$ {{ "%.2f"|format(pedido.PD_TTPD|float)|replace('.', ',') }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h3 class="mt-5 mb-3">Histórico de Alterações Registrado</h3>
+    <div class="table-responsive card">
+        <table class="table table-sm table-striped table-hover table-bordered mb-0">
+            <thead class="table-secondary">
+                <tr>
+                    <th>Data e Hora</th>
+                    <th>Usuário</th>
+                    <th>Operação</th>
+                    <th>Observação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for historico in historicos %}
+                <tr>
+                    <td>{{ historico.HORAACESSO }}</td>
+                    <td>{{ historico.USUARIO }}</td>
+                    <td>{{ historico.operacao_ref.TO_DESC if historico.operacao_ref else historico.OPERACAO }}</td>
+                    <td>{{ historico.OBSE }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="text-center p-4">Nenhum histórico encontrado para este pedido.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="mt-4">
+        <a href="{{ url_for('listar_pedidos_excluidos') }}" class="btn btn-secondary"><i class="bi bi-arrow-left me-1"></i>Voltar para a Lista de Excluídos</a>
+    </div>
+</div>
+{% endblock %}

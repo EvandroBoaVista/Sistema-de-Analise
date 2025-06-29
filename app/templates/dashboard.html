@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+
+{% block styles %}
+{{ super() }}
+<style>
+    .kpi-card {
+        background-color: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 25px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        height: 100%;
+    }
+    .chart-card {
+        background-color: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    /* CORREÇÃO APLICADA */
+    .chart-container {
+        position: relative;
+        width: 100%;
+        height: 350px; /* Altura fixa para a área do gráfico */
+    }
+    .kpi-card {
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .kpi-title {
+        font-size: 1rem;
+        color: #6c757d;
+        font-weight: 500;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+    }
+    .kpi-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #343a40;
+    }
+    .kpi-currency, .kpi-unit {
+        font-size: 1.5rem;
+        font-weight: 600;
+        vertical-align: super;
+        margin-right: 2px;
+    }
+    .filter-card {
+        background-color: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-6">
+            <h1 class="display-5">Dashboard de Análise</h1>
+            <p class="lead text-muted">Resumo dos indicadores de performance.</p>
+        </div>
+    </div>
+    
+    <div class="card filter-card mb-4 shadow-sm">
+        <form method="GET" action="{{ url_for('dashboard') }}" class="row g-3 align-items-center">
+            <div class="col-md-4">
+                <label for="ano" class="form-label fw-bold">Ano</label>
+                <select name="ano" id="ano" class="form-select">
+                    {% for ano in anos_disponiveis %}
+                        <option value="{{ ano }}" {% if ano == ano_selecionado|string %}selected{% endif %}>{{ ano }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="mes" class="form-label fw-bold">Mês</label>
+                <select name="mes" id="mes" class="form-select">
+                    <option value="">Todos os meses</option>
+                    {% set meses_map = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"] %}
+                    {% for i in range(1, 13) %}
+                        <option value="{{ i }}" {% if i == mes_selecionado %}selected{% endif %}>{{ meses_map[i-1] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2"><i class="bi bi-funnel-fill me-1"></i>Filtrar</button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary"><i class="bi bi-calendar-event me-1"></i>Mês Atual</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12">
+            <h4 class="text-muted fw-light">Resultados para o período selecionado</h4>
+            <hr>
+        </div>
+        <div class="col-md-4 col-lg">
+            <div class="kpi-card">
+                <div class="kpi-title">Total de Pedidos</div>
+                <div class="kpi-value">{{ kpis.total_pedidos }}</div>
+            </div>
+        </div>
+        <div class="col-md-4 col-lg">
+            <div class="kpi-card">
+                <div class="kpi-title">Valor dos Pedidos</div>
+                <div class="kpi-value"><span class="kpi-currency">R$</span> {{ kpis.total_faturado }}</div>
+            </div>
+        </div>
+        <div class="col-md-4 col-lg">
+            <div class="kpi-card">
+                <div class="kpi-title">Produtos Vendidos</div>
+                <div class="kpi-value">{{ kpis.total_produtos_vendidos }}</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg">
+            <div class="kpi-card">
+                <div class="kpi-title">Nº Rep. com Vendas</div>
+                <div class="kpi-value">{{ kpis.reps_com_venda }}</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg">
+            <div class="kpi-card">
+                <div class="kpi-title">Tempo Médio para Faturar</div>
+                <div class="kpi-value">{{ kpis.avg_lead_time_recepcao }} <span class="kpi-unit">dias</span></div>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="row g-4 mt-4">
+        <div class="col-lg-8">
+            <div class="chart-card">
+                <div class="chart-container">
+                    <canvas id="faturamentoChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="chart-card">
+                <div class="chart-container">
+                    <canvas id="operacaoChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mt-4">
+        <div class="col-lg-8">
+            <div class="chart-card">
+                <div class="chart-container">
+                    <canvas id="topRepsChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="chart-card">
+                <div class="chart-container">
+                    <canvas id="avgItemsChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="row g-4 mt-5">
+        <div class="col-12">
+            <h4 class="text-muted fw-light">Indicadores Globais</h4>
+            <hr>
+        </div>
+        <div class="col-md-6">
+            <div class="kpi-card">
+                <div class="kpi-title">Clientes Ativos</div>
+                <div class="kpi-value">{{ kpis.clientes_ativos }}</div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="kpi-card">
+                <div class="kpi-title">Representantes Ativos</div>
+                <div class="kpi-value">{{ kpis.representantes_ativos }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const chartFontColor = '#555';
+    const chartGridColor = 'rgba(0, 0, 0, 0.1)';
+
+    Chart.register(ChartDataLabels);
+    Chart.defaults.plugins.datalabels.display = false; 
+
+    function formatNumber(value) {
+        if (value >= 1000000) {
+            return 'R$ ' + (value / 1000000).toFixed(1).replace('.', ',') + 'M';
+        }
+        if (value >= 1000) {
+            return 'R$ ' + (value / 1000).toFixed(1).replace('.', ',') + 'k';
+        }
+        return 'R$ ' + new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+    }
+    
+    const ctxFaturamento = document.getElementById('faturamentoChart');
+    if (ctxFaturamento) {
+        new Chart(ctxFaturamento, {
+            type: 'line',
+            data: {
+                labels: {{ chart_labels|tojson }},
+                datasets: [{
+                    label: 'Valor dos Pedidos (R$)',
+                    data: {{ faturamento_data|tojson }},
+                    fill: true,
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { color: chartFontColor } },
+                    title: { display: true, text: 'Valor dos Pedidos por Mês em {{ ano_selecionado }}', color: chartFontColor, font: { size: 16 } }
+                },
+                scales: {
+                    y: { ticks: { color: chartFontColor }, grid: { color: chartGridColor } },
+                    x: { ticks: { color: chartFontColor }, grid: { color: chartGridColor } }
+                }
+            }
+        });
+    }
+
+    const ctxAvgItems = document.getElementById('avgItemsChart');
+    if (ctxAvgItems) {
+        new Chart(ctxAvgItems, {
+            type: 'bar',
+            data: {
+                labels: {{ chart_labels|tojson }},
+                datasets: [{
+                    label: 'Média de Itens por Pedido',
+                    data: {{ avg_items_data|tojson }},
+                    backgroundColor: 'rgba(255, 159, 64, 0.7)',
+                    borderColor: 'rgba(255, 159, 64, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    title: { display: true, text: 'Ticket Médio (Itens)', color: chartFontColor, font: { size: 16 } }
+                },
+                scales: {
+                    y: { beginAtZero: true, ticks: { color: chartFontColor }, grid: { color: chartGridColor } },
+                    x: { ticks: { color: chartFontColor }, grid: { color: chartGridColor } }
+                }
+            }
+        });
+    }
+
+    const ctxOperacao = document.getElementById('operacaoChart');
+    if (ctxOperacao) {
+        new Chart(ctxOperacao, {
+            type: 'doughnut',
+            data: {
+                labels: {{ operacao_labels|tojson }},
+                datasets: [{
+                    label: 'Valor por Operação',
+                    data: {{ operacao_data|tojson }},
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.8)', 'rgba(54, 162, 235, 0.8)',
+                        'rgba(255, 206, 86, 0.8)', 'rgba(75, 192, 192, 0.8)',
+                        'rgba(153, 102, 255, 0.8)', 'rgba(255, 159, 64, 0.8)'
+                    ],
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { color: chartFontColor, boxWidth: 12 } },
+                    title: { display: true, text: 'Valor por Tipo de Operação', color: chartFontColor, font: { size: 16 } }
+                }
+            }
+        });
+    }
+
+    const ctxTopReps = document.getElementById('topRepsChart');
+    if (ctxTopReps) {
+        new Chart(ctxTopReps, {
+            type: 'bar',
+            data: {
+                labels: {{ top_reps_labels|tojson }},
+                datasets: [{
+                    label: 'Valor de Pedidos (R$)',
+                    data: {{ top_reps_data|tojson }},
+                    backgroundColor: 'rgba(153, 102, 255, 0.7)',
+                    borderColor: 'rgba(153, 102, 255, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    title: { display: true, text: 'Top 10 Representantes por Valor de Pedido', color: chartFontColor, font: { size: 16 } },
+                    datalabels: {
+                        display: true,
+                        anchor: 'end',
+                        align: 'top',
+                        color: chartFontColor,
+                        font: { weight: 'bold' },
+                        formatter: function(value, context) {
+                            return formatNumber(value);
+                        }
+                    }
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        ticks: { color: chartFontColor }, 
+                        grid: { color: chartGridColor } 
+                    },
+                    x: { 
+                        ticks: { 
+                            color: chartFontColor,
+                            maxRotation: 45,
+                            minRotation: 45 
+                        }, 
+                        grid: { display: false } 
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
